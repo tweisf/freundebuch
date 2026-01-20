@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mein Freundebuch</title>
+
+  <!-- Firebase (compat, einfach & stabil) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 20px;
+      background: #fff;
+      max-width: 600px;
+      margin: auto;
+    }
+    h2, h3 {
+      margin-top: 0;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    button {
+      background: #000;
+      color: #fff;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:active {
+      opacity: 0.85;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .entry {
+      border: 1px solid #ddd;
+      padding: 12px;
+      margin: 14px 0;
+      border-radius: 14px;
+    }
+    .entry img {
+      max-width: 100%;
+      margin-top: 8px;
+      border-radius: 10px;
+    }
+    .entry .name {
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .entry .time {
+      font-size: 12px;
+      opacity: 0.6;
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📘 Mein Freundebuch</h2>
+
+<input id="name" placeholder="Dein Name" />
+<textarea id="about" placeholder="Was möchtest du mir sagen?"></textarea>
+<input type="file" id="image" accept="image/*" />
+<button onclick="save()">Eintrag speichern</button>
+
+<p id="status"></p>
+
+<hr style="margin:30px 0">
+
+<h3>📖 Bereits eingetragen</h3>
+<div id="entries"></div>
+
+<script>
+  // 🔥 Firebase Konfiguration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  // 🔐 kleine Sicherheit gegen HTML
+  function escapeHtml(str = "") {
+    return str.replace(/[&<>"']/g, m => ({
+      "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+    }[m]));
+  }
+
+  // 💾 Eintrag speichern
+  async function save() {
+    const name = document.getElementById("name").value.trim();
+    const about = document.getElementById("about").value.trim();
+    const file = document.getElementById("image").files[0];
+
+    if (!name || !file) {
+      alert("Name und Bild sind Pflicht 🙂");
+      return;
+    }
+
+    document.getElementById("status").innerText = "⏳ Speichern...";
+
+    try {
+      const ref = storage.ref("uploads/" + Date.now() + "_" + file.name);
+      await ref.put(file);
+      const imageUrl = await ref.getDownloadURL();
+
+      await db.collection("entries").add({
+        name,
+        about,
+        imageUrl,
+        created: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      document.getElementById("status").innerText = "✅ Gespeichert!";
+      document.getElementById("name").value = "";
+      document.getElementById("about").value = "";
+      document.getElementById("image").value = "";
+
+    } catch (err) {
+      document.getElementById("status").innerText = "❌ Fehler: " + err.message;
+    }
+  }
+
+  // 📖 Einträge laden (live)
+  function loadEntries() {
+    db.collection("entries")
+      .orderBy("created", "desc")
+      .onSnapshot(snapshot => {
+        const container = document.getElementById("entries");
+        container.innerHTML = "";
+
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          const name = escapeHtml(d.name || "");
+          const about = escapeHtml(d.about || "");
+          const time = d.created?.toDate
+            ? d.created.toDate().toLocaleString("de-DE")
+            : "";
+
+          container.innerHTML += `
+            <div class="entry">
+              <div class="name">${name}</div>
+              <div class="time">${time}</div>
+              <div>${about}</div>
+              ${d.imageUrl ? `<img src="${d.imageUrl}">` : ""}
+            </div>
+          `;
+        });
+      });
+  }
+
+  loadEntries();
+</script>
+
+</body>
+</html>
