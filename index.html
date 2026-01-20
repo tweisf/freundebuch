@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mein Freundebuch</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input, textarea, button { width: 100%; margin: 10px 0; padding: 10px; }
+    button { background: black; color: white; border: none; }
+  </style>
+</head>
+<body>
+
+<h2>📘 Mein Freundebuch</h2>
+
+<input id="name" placeholder="Dein Name" />
+<textarea id="about" placeholder="Was möchtest du mir sagen?"></textarea>
+<input type="file" id="image" accept="image/*" />
+<button onclick="save()">Eintrag speichern</button>
+
+<p id="status"></p>
+
+<script>
+  const firebaseConfig = {
+  apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+  authDomain: "freundebuch-neu.firebaseapp.com",
+  projectId: "freundebuch-neu",
+  storageBucket: "freundebuch-neu.firebasestorage.app",
+  messagingSenderId: "732597691942",
+  appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+};
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  async function save() {
+    const name = document.getElementById("name").value;
+    const about = document.getElementById("about").value;
+    const file = document.getElementById("image").files[0];
+
+    if (!name || !file) {
+      alert("Name und Bild sind Pflicht");
+      return;
+    }
+
+    const ref = storage.ref("uploads/" + Date.now() + "_" + file.name);
+    await ref.put(file);
+    const imageUrl = await ref.getDownloadURL();
+
+    await db.collection("entries").add({
+      name,
+      about,
+      imageUrl,
+      created: new Date()
+    });
+
+    document.getElementById("status").innerText = "✅ Gespeichert!";
+  }
+</script>
+
+</body>
+</html>
