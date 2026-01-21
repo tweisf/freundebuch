@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📘 Mein Freundebuch</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h1, h2 {
+      text-align: center;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+
+    input, textarea, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background: black;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button.delete {
+      background: #e74c3c;
+      margin-top: 10px;
+    }
+
+    img {
+      width: 100%;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    .success {
+      color: green;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>📘 Mein Freundebuch</h1>
+
+<div class="card">
+  <h2>✍️ Neuer Eintrag</h2>
+
+  <input id="name" placeholder="Dein Name" />
+  <input id="age" placeholder="Dein Alter" />
+  <input id="color" placeholder="Lieblingsfarbe" />
+  <input id="hobby" placeholder="Lieblingshobby" />
+  <textarea id="about" placeholder="Was möchtest du mir sagen?"></textarea>
+
+  <input type="file" id="image" accept="image/*" />
+
+  <button onclick="saveEntry()">Eintrag speichern</button>
+  <p id="status" class="success"></p>
+</div>
+
+<h2>📖 Einträge</h2>
+<div id="entries"></div>
+
+<script>
+  // 🔥 Firebase Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  // 💾 Speichern
+  async function saveEntry() {
+    const name = nameInput.value;
+    const age = ageInput.value;
+    const color = colorInput.value;
+    const hobby = hobbyInput.value;
+    const about = aboutInput.value;
+    const file = image.files[0];
+
+    if (!name || !file) {
+      alert("Name und Bild sind Pflicht!");
+      return;
+    }
+
+    const ref = storage.ref("uploads/" + Date.now() + "_" + file.name);
+    await ref.put(file);
+    const imageUrl = await ref.getDownloadURL();
+
+    await db.collection("entries").add({
+      name,
+      age,
+      color,
+      hobby,
+      about,
+      imageUrl,
+      created: new Date()
+    });
+
+    status.innerText = "✅ Gespeichert!";
+    document.querySelectorAll("input, textarea").forEach(e => e.value = "");
+    loadEntries();
+  }
+
+  // 📥 Laden
+  async function loadEntries() {
+    const container = document.getElementById("entries");
+    container.innerHTML = "";
+
+    const snapshot = await db.collection("entries")
+      .orderBy("created", "desc")
+      .get();
+
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      container.innerHTML += `
+        <div class="card">
+          <h3>${d.name}</h3>
+          <p>🎂 Alter: ${d.age || "-"}</p>
+          <p>🎨 Lieblingsfarbe: ${d.color || "-"}</p>
+          <p>⭐ Hobby: ${d.hobby || "-"}</p>
+          <p>💬 ${d.about || ""}</p>
+          <img src="${d.imageUrl}">
+          <button class="delete" onclick="deleteEntry('${doc.id}')">🗑️ Eintrag löschen</button>
+        </div>
+      `;
+    });
+  }
+
+  // 🗑️ Löschen
+  async function deleteEntry(id) {
+    if (!confirm("Eintrag wirklich löschen?")) return;
+    await db.collection("entries").doc(id).delete();
+    loadEntries();
+  }
+
+  loadEntries();
+</script>
+
+</body>
+</html>
