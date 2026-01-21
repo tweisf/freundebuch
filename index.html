@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📘 Mein Freundebuch</title>
+
+  <!-- Firebase (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body{
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background:#f4f4f4;
+      padding:20px;
+      max-width:700px;
+      margin:auto;
+    }
+    h1,h2{ text-align:center; }
+    .card{
+      background:#fff;
+      padding:16px;
+      border-radius:14px;
+      margin-bottom:16px;
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+    }
+    label{ font-weight:600; display:block; margin-top:10px; }
+    input, textarea, button{
+      width:100%;
+      padding:12px;
+      margin-top:8px;
+      border-radius:10px;
+      border:1px solid #ddd;
+      font-size:16px;
+      box-sizing:border-box;
+    }
+    textarea{ min-height:90px; resize:vertical; }
+    button{
+      background:#111;
+      color:#fff;
+      border:none;
+      cursor:pointer;
+      margin-top:12px;
+    }
+    button:hover{ opacity:.92; }
+    .row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width:560px){ .row{ grid-template-columns:1fr; } }
+
+    .success{ color:#0a7a2f; font-weight:700; text-align:center; }
+    .muted{ color:#666; font-size:14px; }
+
+    img{
+      width:100%;
+      border-radius:12px;
+      margin-top:10px;
+      display:block;
+    }
+    .entryTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .badge{
+      font-size:12px;
+      background:#f0f0f0;
+      padding:6px 10px;
+      border-radius:999px;
+      color:#333;
+      white-space:nowrap;
+    }
+    .delete{
+      background:#e74c3c;
+      margin-top:10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>📘 Mein Freundebuch</h1>
+
+  <div class="card">
+    <h2>✍️ Neuer Eintrag</h2>
+
+    <label>Dein Name *</label>
+    <input id="name" placeholder="z.B. Tizian" />
+
+    <div class="row">
+      <div>
+        <label>Dein Alter</label>
+        <input id="age" placeholder="z.B. 18" />
+      </div>
+      <div>
+        <label>Lieblingsfarbe</label>
+        <input id="color" placeholder="z.B. Blau" />
+      </div>
+    </div>
+
+    <label>Lieblingshobby</label>
+    <input id="hobby" placeholder="z.B. Fußball / Zocken / Zeichnen" />
+
+    <label>Was möchtest du mir sagen?</label>
+    <textarea id="about" placeholder="Schreib hier was Nettes :)"></textarea>
+
+    <label>Bild *</label>
+    <input type="file" id="image" accept="image/*" />
+
+    <button id="saveBtn">Eintrag speichern</button>
+    <p id="status" class="success"></p>
+    <p class="muted">* Pflichtfelder: Name + Bild</p>
+  </div>
+
+  <h2>📖 Einträge</h2>
+  <div id="entries" class="muted">Lade Einträge…</div>
+
+<script>
+  // ✅ Firebase Config (deine Daten)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  const el = (id) => document.getElementById(id);
+
+  // 🔥 Speichern
+  async function saveEntry() {
+    const name  = el("name").value.trim();
+    const age   = el("age").value.trim();
+    const color = el("color").value.trim();
+    const hobby = el("hobby").value.trim();
+    const about = el("about").value.trim();
+    const file  = el("image").files[0];
+
+    if (!name || !file) {
+      alert("Name und Bild sind Pflicht!");
+      return;
+    }
+
+    el("status").innerText = "⏳ Upload läuft…";
+
+    // Bild hochladen
+    const safeName = (file.name || "bild").replace(/\s+/g, "_");
+    const path = "uploads/" + Date.now() + "_" + safeName;
+    const ref = storage.ref(path);
+    await ref.put(file);
+    const imageUrl = await ref.getDownloadURL();
+
+    // Daten speichern (inkl. storagePath fürs spätere Löschen)
+    await db.collection("entries").add({
+      name, age, color, hobby, about,
+      imageUrl,
+      storagePath: path,
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    el("status").innerText = "✅ Gespeichert!";
+
+    // Felder leeren
+    el("name").value = "";
+    el("age").value = "";
+    el("color").value = "";
+    el("hobby").value = "";
+    el("about").value = "";
+    el("image").value = "";
+
+    await loadEntries();
+  }
+
+  // 📥 Laden
+  async function loadEntries() {
+    const container = el("entries");
+    container.innerHTML = "Lade Einträge…";
+
+    const snap = await db.collection("entries")
+      .orderBy("created", "desc")
+      .get();
+
+    if (snap.empty) {
+      container.innerHTML = "<div class='muted'>Noch keine Einträge.</div>";
+      return;
+    }
+
+    container.innerHTML = "";
+    snap.forEach(doc => {
+      const d = doc.data();
+      const created = d.created?.toDate ? d.created.toDate() : null;
+      const dateText = created ? created.toLocaleString("de-DE") : "";
+
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="entryTitle">
+          <h3 style="margin:0;">${escapeHtml(d.name || "")}</h3>
+          <span class="badge">${escapeHtml(dateText)}</span>
+        </div>
+        <p>🎂 Alter: ${escapeHtml(d.age || "-")}</p>
+        <p>🎨 Lieblingsfarbe: ${escapeHtml(d.color || "-")}</p>
+        <p>⭐ Hobby: ${escapeHtml(d.hobby || "-")}</p>
+        <p>💬 ${escapeHtml(d.about || "")}</p>
+        ${d.imageUrl ? `<img src="${d.imageUrl}" alt="Bild">` : ""}
+        <button class="delete" data-id="${doc.id}" data-path="${d.storagePath || ""}">🗑️ Eintrag löschen</button>
+      `;
+      container.appendChild(card);
+    });
+
+    // Delete-Buttons aktivieren
+    container.querySelectorAll(".delete").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const path = btn.getAttribute("data-path") || "";
+        await deleteEntry(id, path);
+      });
+    });
+  }
+
+  // 🗑️ Löschen (Firestore + Storage)
+  async function deleteEntry(id, storagePath) {
+    if (!confirm("Eintrag wirklich löschen?")) return;
+
+    // 1) Firestore löschen
+    await db.collection("entries").doc(id).delete();
+
+    // 2) Bild im Storage löschen (wenn Pfad vorhanden)
+    if (storagePath) {
+      try {
+        await storage.ref(storagePath).delete();
+      } catch (e) {
+        // falls Datei schon weg ist → egal
+        console.log("Storage delete warn:", e?.message || e);
+      }
+    }
+
+    await loadEntries();
+  }
+
+  // Schutz gegen HTML-Injection
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // Button hooken
+  el("saveBtn").addEventListener("click", saveEntry);
+
+  // Start
+  loadEntries();
+</script>
+
+</body>
+</html>
