@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin</title>
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <div class="bg"></div>
+
+  <main class="shell">
+    <header class="hero">
+      <div class="badge">🔒</div>
+      <div>
+        <h1>Admin</h1>
+        <p class="muted">Login + Einträge verwalten (löschen nur Admin).</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="row two">
+        <div>
+          <div class="label">E-Mail</div>
+          <input class="input" id="email" type="email" placeholder="male01.w@gmail.com" />
+        </div>
+        <div>
+          <div class="label">Passwort</div>
+          <input class="input" id="pw" type="password" placeholder="••••••••" />
+        </div>
+      </div>
+
+      <div class="row two" style="margin-top:10px;">
+        <button class="actionBtn" id="loginBtn">Einloggen</button>
+        <button class="actionBtn" id="logoutBtn">Logout</button>
+      </div>
+
+      <div class="notice" id="who"></div>
+
+      <hr class="soft">
+
+      <div class="row two">
+        <button class="actionBtn" id="loadFriends">📗 Freundebuch laden</button>
+        <button class="actionBtn" id="loadGuests">📝 Gästebuch laden</button>
+      </div>
+
+      <div id="list" style="margin-top:12px;"></div>
+    </section>
+
+    <a class="adminFab" href="index.html" title="Start">🏠</a>
+  </main>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+  const auth = firebase.auth();
+
+  const ADMIN_EMAIL = "male01.w@gmail.com";
+
+  const esc = (s) => String(s ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  function fmtDate(ts){
+    try{
+      const d = ts?.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString("de-DE", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+    }catch(e){ return ""; }
+  }
+
+  const who = document.getElementById("who");
+  const list = document.getElementById("list");
+
+  function isAdmin(){
+    return auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+  }
+
+  auth.onAuthStateChanged(u=>{
+    if(!u){
+      who.innerHTML = `<span class="muted">Nicht eingeloggt.</span>`;
+    }else{
+      who.innerHTML = `Eingeloggt als <b>${esc(u.email)}</b> ${isAdmin() ? '<span class="pill" style="margin-left:8px;">Admin</span>' : '<span class="pill" style="margin-left:8px;">Kein Admin</span>'}`;
+    }
+  });
+
+  async function login(){
+    const email = document.getElementById("email").value.trim();
+    const pw = document.getElementById("pw").value;
+    await auth.signInWithEmailAndPassword(email, pw);
+  }
+
+  async function logout(){
+    await auth.signOut();
+  }
+
+  async function deleteEntry(entryId, imageUrl){
+    if(!isAdmin()){
+      alert("Nur Admin darf löschen.");
+      return;
+    }
+    if(!confirm("Wirklich löschen?")) return;
+
+    // 1) Firestore doc löschen
+    await db.collection("entries").doc(entryId).delete();
+
+    // 2) Bild löschen (wenn vorhanden)
+    if(imageUrl){
+      try{
+        const ref = storage.refFromURL(imageUrl);
+        await ref.delete();
+      }catch(e){
+        // falls URL nicht löschbar ist, ignorieren
+      }
+    }
+
+    alert("Gelöscht.");
+  }
+
+  async function load(type){
+    list.innerHTML = `<div class="muted">Lade…</div>`;
+    const snap = await db.collection("entries")
+      .where("type","==",type)
+      .orderBy("createdAt","desc")
+      .limit(50)
+      .get();
+
+    if(snap.empty){
+      list.innerHTML = `<div class="muted">Keine Einträge.</div>`;
+      return;
+    }
+
+    const html = snap.docs.map(d=>{
+      const data = d.data();
+      return `
+        <div class="entry" style="margin-top:10px;">
+          <div class="entryTop">
+            <div>
+              <div class="entryName">${esc(data.name || "Unbekannt")}</div>
+              <div class="entryMeta">🕒 ${esc(fmtDate(data.createdAt))} • ${esc(data.type)}</div>
+            </div>
+            <button class="actionBtn" onclick="deleteEntry('${esc(d.id)}','${esc(data.imageUrl||"")}')">🗑️ Löschen</button>
+          </div>
+          <div class="entryBody">
+            <div class="tiny muted">DocID: ${esc(d.id)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    list.innerHTML = html;
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", ()=> login().catch(e=>alert(e.message)));
+  document.getElementById("logoutBtn").addEventListener("click", ()=> logout().catch(e=>alert(e.message)));
+  document.getElementById("loadFriends").addEventListener("click", ()=> load("freundebuch").catch(e=>alert(e.message)));
+  document.getElementById("loadGuests").addEventListener("click", ()=> load("gaestebuch").catch(e=>alert(e.message)));
+
+  // Expose delete to inline onclick
+  window.deleteEntry = deleteEntry;
+</script>
+</body>
+</html>
