@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📘 Mein Freundebuch</title>
+
+  <!-- Firebase (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <style>
+    body{
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(180deg,#f6f7ff,#f3f3f3);
+      padding:20px;
+      max-width:900px;
+      margin:auto;
+      color:#111;
+    }
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center;
+      gap:10px; margin-bottom:14px;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; }
+    .logo{
+      width:40px; height:40px; border-radius:12px;
+      background:#111; color:#fff; display:grid; place-items:center;
+      font-weight:800;
+    }
+    h1{ margin:0; font-size:22px; }
+    .pillBtn{
+      border:none; background:#111; color:#fff; padding:10px 14px;
+      border-radius:999px; cursor:pointer; font-weight:650;
+    }
+    .pillBtn.alt{ background:#fff; color:#111; border:1px solid #ddd; }
+    .grid{
+      display:grid; grid-template-columns: 1fr 1fr; gap:14px;
+    }
+    @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background:#fff;
+      padding:16px;
+      border-radius:16px;
+      box-shadow:0 10px 26px rgba(0,0,0,.08);
+      border:1px solid rgba(0,0,0,.06);
+    }
+    .muted{ color:#666; font-size:14px; }
+    label{ font-weight:700; display:block; margin-top:10px; }
+    input, textarea, button{
+      width:100%;
+      padding:12px;
+      margin-top:8px;
+      border-radius:12px;
+      border:1px solid #ddd;
+      font-size:16px;
+      box-sizing:border-box;
+    }
+    textarea{ min-height:90px; resize:vertical; }
+    button.primary{
+      background:#111; color:#fff; border:none; cursor:pointer; font-weight:750;
+    }
+    button.primary:hover{ opacity:.92; }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width:560px){ .row{ grid-template-columns:1fr; } }
+
+    .success{ color:#0a7a2f; font-weight:800; }
+    .danger{ background:#e74c3c; color:#fff; border:none; font-weight:750; cursor:pointer; }
+    .danger:hover{ opacity:.92; }
+
+    .entryHeader{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .badge{
+      font-size:12px; background:#f0f0f0; padding:6px 10px; border-radius:999px;
+      color:#333; white-space:nowrap;
+    }
+    img{
+      width:100%;
+      border-radius:14px;
+      margin-top:10px;
+      display:block;
+      border:1px solid rgba(0,0,0,.06);
+    }
+    .actions{
+      display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;
+    }
+    .likeBtn{
+      background:#fff; border:1px solid #ddd; border-radius:999px;
+      padding:10px 14px; cursor:pointer; font-weight:750;
+    }
+    .likeBtn:hover{ background:#fafafa; }
+
+    .comments{
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid #eee;
+    }
+    .comment{
+      background:#fafafa;
+      border:1px solid #eee;
+      padding:10px 12px;
+      border-radius:12px;
+      margin-top:8px;
+    }
+    .comment small{ color:#666; display:block; margin-top:6px; }
+    .adminBox{
+      display:none;
+      margin-top:12px;
+      padding:12px;
+      border:1px dashed #ccc;
+      border-radius:14px;
+      background:#fcfcff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">FB</div>
+      <div>
+        <h1>Mein Freundebuch</h1>
+        <div class="muted">Einträge • Likes • Kommentare</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button class="pillBtn alt" id="adminToggle">Admin</button>
+      <button class="pillBtn" id="reloadBtn">Neu laden</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Formular -->
+    <div class="card">
+      <h2 style="margin:0 0 6px 0;">✍️ Neuer Eintrag</h2>
+      <div class="muted">Pflicht: Name + Bild</div>
+
+      <label>Dein Name *</label>
+      <input id="name" placeholder="z.B. Tizian" />
+
+      <div class="row">
+        <div>
+          <label>Alter</label>
+          <input id="age" placeholder="z.B. 18" />
+        </div>
+        <div>
+          <label>Lieblingsfarbe</label>
+          <input id="color" placeholder="z.B. Blau" />
+        </div>
+      </div>
+
+      <label>Lieblingshobby</label>
+      <input id="hobby" placeholder="z.B. Fußball / Zocken" />
+
+      <label>Was möchtest du mir sagen?</label>
+      <textarea id="about" placeholder="Schreib hier was Nettes :)"></textarea>
+
+      <label>Bild *</label>
+      <input type="file" id="image" accept="image/*" />
+
+      <button class="primary" id="saveBtn">Eintrag speichern</button>
+      <p id="status" class="success"></p>
+
+      <!-- Admin Login -->
+      <div class="adminBox" id="adminBox">
+        <h3 style="margin:0 0 6px 0;">🔐 Admin Login</h3>
+        <div class="muted">Nur Admin kann löschen.</div>
+
+        <label>E-Mail</label>
+        <input id="adminEmail" type="email" placeholder="Admin E-Mail" />
+
+        <label>Passwort</label>
+        <input id="adminPass" type="password" placeholder="Passwort" />
+
+        <div class="actions">
+          <button class="pillBtn" id="loginBtn" style="flex:1;">Login</button>
+          <button class="pillBtn alt" id="logoutBtn" style="flex:1;">Logout</button>
+        </div>
+
+        <p class="muted" id="adminStatus"></p>
+      </div>
+    </div>
+
+    <!-- Liste -->
+    <div>
+      <h2 style="margin:0 0 10px 0;">📖 Einträge</h2>
+      <div id="entries" class="muted">Lade Einträge…</div>
+    </div>
+  </div>
+
+<script>
+  // =========================
+  // Firebase Config
+  // =========================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+  const auth = firebase.auth();
+
+  // ✅ Admin Email (nur der darf löschen)
+  const ADMIN_EMAIL = "male01.w@gmail.com";
+
+  const el = (id) => document.getElementById(id);
+
+  // "User-ID" für Likes (ohne Login)
+  function getLocalUid() {
+    let uid = localStorage.getItem("fb_uid");
+    if (!uid) {
+      uid = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem("fb_uid", uid);
+    }
+    return uid;
+  }
+
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function isAdminUser(user) {
+    return !!user && (user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }
+
+  // =========================
+  // Admin UI
+  // =========================
+  el("adminToggle").addEventListener("click", () => {
+    const box = el("adminBox");
+    box.style.display = (box.style.display === "block") ? "none" : "block";
+  });
+
+  el("loginBtn").addEventListener("click", async () => {
+    const email = el("adminEmail").value.trim();
+    const pass = el("adminPass").value.trim();
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } catch (e) {
+      el("adminStatus").innerText = "❌ Login fehlgeschlagen: " + (e.message || e);
+    }
+  });
+
+  el("logoutBtn").addEventListener("click", async () => {
+    await auth.signOut();
+  });
+
+  auth.onAuthStateChanged((user) => {
+    if (isAdminUser(user)) {
+      el("adminStatus").innerText = "✅ Eingeloggt als Admin: " + user.email;
+    } else if (user) {
+      el("adminStatus").innerText = "⚠️ Eingeloggt, aber NICHT Admin: " + user.email;
+    } else {
+      el("adminStatus").innerText = "Nicht eingeloggt.";
+    }
+    loadEntries();
+  });
+
+  // =========================
+  // Speichern
+  // =========================
+  async function saveEntry() {
+    const name  = el("name").value.trim();
+    const age   = el("age").value.trim();
+    const color = el("color").value.trim();
+    const hobby = el("hobby").value.trim();
+    const about = el("about").value.trim();
+    const file  = el("image").files[0];
+
+    if (!name || !file) {
+      alert("Name und Bild sind Pflicht!");
+      return;
+    }
+
+    el("status").innerText = "⏳ Upload läuft…";
+
+    const safeName = (file.name || "bild").replace(/\s+/g, "_");
+    const path = "uploads/" + Date.now() + "_" + safeName;
+
+    const ref = storage.ref(path);
+    await ref.put(file);
+    const imageUrl = await ref.getDownloadURL();
+
+    await db.collection("entries").add({
+      name, age, color, hobby, about,
+      imageUrl,
+      storagePath: path,
+      likesCount: 0,
+      likedBy: {}, // map uid->true
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    el("status").innerText = "✅ Gespeichert!";
+    el("name").value = "";
+    el("age").value = "";
+    el("color").value = "";
+    el("hobby").value = "";
+    el("about").value = "";
+    el("image").value = "";
+
+    await loadEntries();
+  }
+
+  el("saveBtn").addEventListener("click", saveEntry);
+  el("reloadBtn").addEventListener("click", loadEntries);
+
+  // =========================
+  // Laden + Rendern
+  // =========================
+  async function loadEntries() {
+    const container = el("entries");
+    container.innerHTML = "Lade Einträge…";
+
+    let snap;
+    try {
+      snap = await db.collection("entries").orderBy("created", "desc").get();
+    } catch (e) {
+      container.innerHTML = "❌ Fehler beim Laden: " + (e.message || e);
+      return;
+    }
+
+    if (snap.empty) {
+      container.innerHTML = "<div class='muted'>Noch keine Einträge.</div>";
+      return;
+    }
+
+    container.innerHTML = "";
+    const user = auth.currentUser;
+    const admin = isAdminUser(user);
+    const uid = getLocalUid();
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      const created = d.created?.toDate ? d.created.toDate() : null;
+      const dateText = created ? created.toLocaleString("de-DE") : "";
+
+      const likedBy = d.likedBy || {};
+      const alreadyLiked = !!likedBy[uid];
+      const likesCount = Number(d.likesCount || 0);
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <div class="entryHeader">
+          <h3 style="margin:0;">${escapeHtml(d.name)}</h3>
+          <span class="badge">${escapeHtml(dateText)}</span>
+        </div>
+
+        <div class="muted" style="margin-top:6px;">
+          🎂 ${escapeHtml(d.age || "-")} • 🎨 ${escapeHtml(d.color || "-")} • ⭐ ${escapeHtml(d.hobby || "-")}
+        </div>
+
+        <p style="margin:10px 0 0 0;">💬 ${escapeHtml(d.about || "")}</p>
+
+        ${d.imageUrl ? `<img src="${d.imageUrl}" alt="Bild">` : ""}
+
+        <div class="actions">
+          <button class="likeBtn" data-like="${doc.id}">
+            ${alreadyLiked ? "❤️" : "🤍"} Gefällt mir (${likesCount})
+          </button>
+
+          ${admin ? `<button class="danger" data-del="${doc.id}" data-path="${escapeHtml(d.storagePath || "")}">🗑️ Löschen</button>` : ""}
+        </div>
+
+        <div class="comments">
+          <strong>💭 Kommentare</strong>
+          <div class="muted" id="c_${doc.id}">Lade Kommentare…</div>
+
+          <label style="margin-top:10px;">Name</label>
+          <input id="cn_${doc.id}" placeholder="Dein Name" />
+
+          <label>Kommentar</label>
+          <textarea id="ct_${doc.id}" placeholder="Schreib einen Kommentar…"></textarea>
+
+          <button class="primary" data-addc="${doc.id}">Kommentar posten</button>
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      // Kommentare laden
+      loadComments(doc.id);
+
+      // Like handler
+      card.querySelector(`[data-like="${doc.id}"]`).addEventListener("click", async () => {
+        await toggleLike(doc.id);
+      });
+
+      // Delete handler (nur Admin sieht Button)
+      const delBtn = card.querySelector(`[data-del="${doc.id}"]`);
+      if (delBtn) {
+        delBtn.addEventListener("click", async () => {
+          const storagePath = delBtn.getAttribute("data-path") || "";
+          await deleteEntry(doc.id, storagePath);
+        });
+      }
+
+      // Add comment handler
+      card.querySelector(`[data-addc="${doc.id}"]`).addEventListener("click", async () => {
+        const n = el(`cn_${doc.id}`).value.trim() || "Anonym";
+        const t = el(`ct_${doc.id}`).value.trim();
+        if (!t) { alert("Kommentar ist leer."); return; }
+        await addComment(doc.id, n, t);
+        el(`ct_${doc.id}`).value = "";
+      });
+    }
+  }
+
+  // =========================
+  // Likes (ohne Login)
+  // =========================
+  async function toggleLike(entryId) {
+    const uid = getLocalUid();
+    const ref = db.collection("entries").doc(entryId);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      const d = snap.data() || {};
+      const likedBy = d.likedBy || {};
+      let likesCount = Number(d.likesCount || 0);
+
+      if (likedBy[uid]) {
+        // unlike
+        delete likedBy[uid];
+        likesCount = Math.max(0, likesCount - 1);
+      } else {
+        // like
+        likedBy[uid] = true;
+        likesCount = likesCount + 1;
+      }
+
+      tx.update(ref, { likedBy, likesCount });
+    });
+
+    await loadEntries();
+  }
+
+  // =========================
+  // Kommentare
+  // =========================
+  async function addComment(entryId, name, text) {
+    const cref = db.collection("entries").doc(entryId).collection("comments");
+    await cref.add({
+      name,
+      text,
+      created: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await loadComments(entryId);
+  }
+
+  async function loadComments(entryId) {
+    const box = el(`c_${entryId}`);
+    if (!box) return;
+
+    try {
+      const snap = await db.collection("entries").doc(entryId)
+        .collection("comments")
+        .orderBy("created", "asc")
+        .limit(50)
+        .get();
+
+      if (snap.empty) {
+        box.innerHTML = "<div class='muted'>Noch keine Kommentare.</div>";
+        return;
+      }
+
+      box.innerHTML = "";
+      snap.forEach(doc => {
+        const c = doc.data();
+        const created = c.created?.toDate ? c.created.toDate() : null;
+        const dateText = created ? created.toLocaleString("de-DE") : "";
+
+        const div = document.createElement("div");
+        div.className = "comment";
+        div.innerHTML = `
+          <strong>${escapeHtml(c.name || "Anonym")}</strong>
+          <div>${escapeHtml(c.text || "")}</div>
+          <small>${escapeHtml(dateText)}</small>
+        `;
+        box.appendChild(div);
+      });
+    } catch (e) {
+      box.innerHTML = "❌ Kommentare konnten nicht geladen werden: " + (e.message || e);
+    }
+  }
+
+  // =========================
+  // Löschen (nur Admin)
+  // =========================
+  async function deleteEntry(id, storagePath) {
+    const user = auth.currentUser;
+    if (!isAdminUser(user)) {
+      alert("Nur Admin darf löschen.");
+      return;
+    }
+    if (!confirm("Eintrag wirklich löschen?")) return;
+
+    await db.collection("entries").doc(id).delete();
+
+    if (storagePath) {
+      try {
+        await storage.ref(storagePath).delete();
+      } catch (e) {
+        console.log("Storage delete warn:", e?.message || e);
+      }
+    }
+    await loadEntries();
+  }
+
+  // Start
+  loadEntries();
+</script>
+
+</body>
+</html>
