@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin – Freundebuch</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body{margin:0;font-family:system-ui;background:#0b1020;color:#eef2ff;padding:18px}
+    .wrap{max-width:900px;margin:0 auto}
+    .card{background:#0f1730;border:1px solid #263055;border-radius:16px;padding:14px;margin:10px 0}
+    .btn{border:none;border-radius:12px;padding:10px 12px;font-weight:700;cursor:pointer}
+    .btnA{background:#22c55e;color:#04110a}
+    .btnD{background:#ef4444;color:white}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .entry{display:flex;justify-content:space-between;gap:10px}
+    .muted{color:#aab3d6;font-size:12px}
+    a{color:#93c5fd;text-decoration:none}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <h2>🔧 Admin – Freundebuch</h2>
+  <div class="muted">Nur du: Login + Einträge löschen.</div>
+  <div class="muted"><a href="./index.html">← zurück zur normalen Seite</a></div>
+
+  <div class="card row">
+    <button class="btn btnA" onclick="loginGoogle()">Mit Google einloggen</button>
+    <button class="btn" onclick="logout()">Logout</button>
+    <div class="muted" id="who">nicht eingeloggt</div>
+  </div>
+
+  <div class="card">
+    <h3>Einträge</h3>
+    <div class="muted" id="count">lädt…</div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const whoEl = document.getElementById("who");
+  const listEl = document.getElementById("list");
+  const countEl = document.getElementById("count");
+
+  // 🔐 WICHTIG: setz HIER deine Admin-E-Mail rein (die du bei Google Login benutzt)
+  const ADMIN_EMAIL = ""; // z.B. "deinname@gmail.com"
+
+  function loginGoogle(){
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider);
+  }
+
+  function logout(){
+    auth.signOut();
+  }
+
+  auth.onAuthStateChanged(user => {
+    if(!user){
+      whoEl.textContent = "nicht eingeloggt";
+      listEl.innerHTML = `<div class="muted">Bitte einloggen.</div>`;
+      return;
+    }
+    whoEl.textContent = `eingeloggt: ${user.email || user.uid}`;
+
+    if(ADMIN_EMAIL && user.email !== ADMIN_EMAIL){
+      listEl.innerHTML = `<div class="muted">Du bist eingeloggt, aber nicht als Admin erlaubt.</div>`;
+      return;
+    }
+
+    db.collection("entries").orderBy("created","desc").limit(100).onSnapshot(snap=>{
+      countEl.textContent = `${snap.size} Einträge`;
+      listEl.innerHTML = "";
+      snap.forEach(doc=>{
+        const d = doc.data();
+        const div = document.createElement("div");
+        div.className = "card entry";
+        div.innerHTML = `
+          <div>
+            <div><b>${escapeHtml(d.name||"")}</b></div>
+            <div class="muted">${doc.id}</div>
+          </div>
+          <button class="btn btnD">Löschen</button>
+        `;
+        div.querySelector("button").onclick = async () => {
+          if(!confirm("Wirklich löschen?")) return;
+          await db.collection("entries").doc(doc.id).delete();
+          alert("Gelöscht.");
+        };
+        listEl.appendChild(div);
+      });
+    });
+  });
+
+  function escapeHtml(str){
+    return (str || "").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+</script>
+</body>
+</html>
