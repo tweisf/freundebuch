@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freundebuch / Gästebuch</title>
+
+<style>
+body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#f8fafc}
+main{max-width:820px;margin:auto;padding:20px}
+.card{background:#020617;border:1px solid #1e293b;border-radius:16px;padding:16px;margin-bottom:16px}
+h1{margin:0 0 10px}
+p{margin:0 0 14px;color:#94a3b8;line-height:1.4}
+
+.grid{display:grid;gap:12px}
+@media (min-width:720px){.grid{grid-template-columns:1fr 1fr}}
+
+.btn{
+  display:block;padding:16px;border-radius:16px;
+  border:1px solid #334155;background:#020617;color:#f8fafc;text-decoration:none
+}
+.btn:hover{border-color:#475569}
+.btnTitle{font-weight:900;font-size:18px;margin-bottom:6px}
+.btnSub{color:#94a3b8;font-size:13px}
+
+.accentA{background:linear-gradient(135deg,rgba(99,102,241,.28),rgba(34,211,238,.16))}
+.accentB{background:linear-gradient(135deg,rgba(52,211,153,.22),rgba(96,165,250,.16))}
+
+.adminDot{
+  position:fixed;right:10px;bottom:10px;width:12px;height:12px;
+  border-radius:50%;background:#334155;opacity:.5;z-index:1000
+}
+.adminDot:hover{opacity:1;background:#64748b}
+
+/* Logout Button (klein & unauffällig) */
+.logoutBtn{
+  position:fixed;left:10px;bottom:10px;z-index:1000;
+  font-size:12px;padding:6px 10px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.40);
+  color:#cbd5e1;
+  cursor:pointer;
+  opacity:.75;
+}
+.logoutBtn:hover{opacity:1}
+
+/* Passwort Overlay */
+#lockOverlay{
+  position:fixed; inset:0; z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(2,6,23,.88);
+  backdrop-filter: blur(10px);
+}
+#lockCard{
+  width:min(420px,92vw);
+  background:#020617;
+  border:1px solid #1e293b;
+  border-radius:18px;
+  padding:16px;
+  color:#f8fafc;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+}
+#lockTitle{font-size:20px;font-weight:900;margin-bottom:6px;}
+#lockSub{color:#94a3b8;font-size:13px;margin-bottom:12px;}
+#pwInput{
+  width:100%; padding:12px; border-radius:14px;
+  border:1px solid #334155; background:#0b1220; color:#f8fafc;
+  outline:none;
+}
+#pwBtn{
+  width:100%; margin-top:10px; padding:12px; border-radius:14px;
+  border:none; font-weight:900; cursor:pointer;
+  background:linear-gradient(135deg,#60a5fa,#a78bfa); color:#06122a;
+}
+#pwMsg{margin-top:10px; font-weight:900; color:#fb7185; display:none;}
+</style>
+</head>
+
+<body>
+
+<!-- Passwort-Sperre -->
+<div id="lockOverlay">
+  <div id="lockCard">
+    <div id="lockTitle">🔒 Zugang</div>
+    <div id="lockSub">Bitte Passwort eingeben, um fortzufahren.</div>
+
+    <input id="pwInput" type="password" inputmode="numeric" placeholder="Passwort">
+    <button id="pwBtn">Weiter</button>
+
+    <div id="pwMsg">❌ Falsches Passwort</div>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <h1>Willkommen ✨</h1>
+    <p>Wähle aus, wo du dich eintragen willst.</p>
+
+    <div class="grid">
+      <a class="btn accentA" href="freundebuch.html">
+        <div class="btnTitle">📘 Freundebuch</div>
+        <div class="btnSub">Locker, erwachsen, mit Auswahlspiel</div>
+      </a>
+
+      <a class="btn accentB" href="gaestebuch.html">
+        <div class="btnTitle">📝 Gästebuch</div>
+        <div class="btnSub">Anlass, Emoji, Lieblingsmoment</div>
+      </a>
+    </div>
+  </div>
+</main>
+
+<a href="admin.html" class="adminDot" title="Admin"></a>
+<button class="logoutBtn" id="logoutBtn" type="button">🔒 Logout</button>
+
+<script>
+(function(){
+  const CORRECT = "1234";
+  const KEY = "fb_unlocked";
+
+  const overlay = document.getElementById("lockOverlay");
+  const input = document.getElementById("pwInput");
+  const btn = document.getElementById("pwBtn");
+  const msg = document.getElementById("pwMsg");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  function hideLock(){
+    overlay.style.display = "none";
+    msg.style.display = "none";
+  }
+
+  function showLock(){
+    overlay.style.display = "flex";
+    msg.style.display = "none";
+    input.value = "";
+    setTimeout(()=>input.focus(), 50);
+  }
+
+  // Wenn schon freigeschaltet → Overlay ausblenden
+  if(localStorage.getItem(KEY) === "1"){
+    hideLock();
+  } else {
+    showLock();
+  }
+
+  function unlock(){
+    const val = (input.value || "").trim();
+    if(val === CORRECT){
+      localStorage.setItem(KEY, "1");
+      hideLock();
+    } else {
+      msg.style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  btn.addEventListener("click", unlock);
+  input.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") unlock();
+  });
+
+  // Logout: sperrt wieder
+  logoutBtn.addEventListener("click", () => {
+    if(confirm("Wirklich ausloggen?")){
+      localStorage.removeItem(KEY);
+      showLock();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
