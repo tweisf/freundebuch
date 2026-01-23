@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#f8fafc}
+  main{max-width:900px;margin:auto;padding:20px}
+  .hero{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .icon{width:52px;height:52px;border-radius:16px;background:rgba(148,163,184,.15);display:flex;align-items:center;justify-content:center;border:1px solid rgba(148,163,184,.25)}
+  .title{font-size:42px;font-weight:900;margin:0}
+  .sub{color:#cbd5e1;margin:0}
+  .card{
+    background:rgba(2,6,23,.55);
+    border:1px solid rgba(148,163,184,.25);
+    border-radius:22px;
+    padding:16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  label{display:block;font-size:13px;color:#94a3b8;margin-top:10px}
+  input,button{
+    width:100%;padding:12px;border-radius:14px;border:1px solid rgba(148,163,184,.25);
+    background:rgba(15,23,42,.35);color:#f8fafc;margin-top:6px
+  }
+  button{cursor:pointer;font-weight:800}
+  .btnRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .btn{flex:1;min-width:180px;background:rgba(148,163,184,.12)}
+  .btnPrimary{background:linear-gradient(135deg,#60a5fa,#34d399);border:none}
+  .btnDanger{background:linear-gradient(135deg,#fb7185,#f97316);border:none}
+  .muted{color:#94a3b8;margin-top:10px}
+  .status{margin-top:10px;font-weight:800}
+  .ok{color:#34d399}
+  .err{color:#fb7185}
+
+  .list{margin-top:14px}
+  .entry{
+    border:1px solid rgba(148,163,184,.22);
+    border-radius:18px;
+    padding:12px;
+    margin-top:12px;
+    background:rgba(2,6,23,.35)
+  }
+  .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+  .pill{font-size:12px;color:#cbd5e1;padding:6px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.22);background:rgba(148,163,184,.08)}
+  .name{font-weight:900;font-size:18px;margin:0}
+  .meta{color:#94a3b8;font-size:13px;margin-top:2px}
+  .q{color:#94a3b8;font-size:12px;margin-top:10px}
+  .a{margin-top:3px;white-space:pre-wrap}
+  img{width:100%;max-width:360px;border-radius:14px;margin-top:10px;border:1px solid rgba(148,163,184,.18)}
+
+  /* Home Button unten rechts */
+  .homeBtn{
+    position:fixed;right:14px;bottom:14px;
+    width:56px;height:56px;border-radius:18px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(148,163,184,.25);
+    background:rgba(2,6,23,.45);
+    color:#f8fafc;text-decoration:none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index:1000;
+  }
+  .homeBtn:active{transform:scale(.98)}
+
+  /* ===== Diashow Admin ===== */
+  .sectionTitle{font-weight:900;font-size:16px;margin:0}
+  .sectionSub{color:#94a3b8;font-size:13px;margin:6px 0 0}
+  hr.soft{border:none;border-top:1px solid rgba(148,163,184,.18);margin:14px 0}
+
+  .heroGrid{display:grid;gap:12px}
+  @media (min-width:820px){ .heroGrid{grid-template-columns: 1.1fr .9fr} }
+
+  .thumbGrid{display:grid;gap:10px;grid-template-columns:1fr}
+  @media (min-width:720px){ .thumbGrid{grid-template-columns: 1fr 1fr} }
+
+  .thumb{
+    border:1px solid rgba(148,163,184,.22);
+    border-radius:16px;
+    overflow:hidden;
+    background:rgba(2,6,23,.35);
+    padding:10px;
+  }
+  .thumb img{
+    width:100%;display:block;border-radius:12px;border:1px solid rgba(148,163,184,.18);
+    aspect-ratio: 16/9; object-fit: cover;
+  }
+  .thumbMeta{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px}
+  .thumbName{font-weight:900}
+  .mini{font-size:12px;color:#94a3b8}
+  .miniBtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .miniBtn{
+    width:auto;margin:0;
+    padding:8px 10px;border-radius:12px;
+    border:1px solid rgba(148,163,184,.25);
+    background:rgba(148,163,184,.10);
+    color:#f8fafc;
+    cursor:pointer;
+    font-weight:900;
+  }
+  .miniBtn:hover{border-color:rgba(148,163,184,.35)}
+  .miniBtnDanger{
+    border:none;
+    background:linear-gradient(135deg,#fb7185,#f97316);
+  }
+  .miniBtnOk{
+    border:none;
+    background:linear-gradient(135deg,#34d399,#60a5fa);
+  }
+  .tagHidden{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;
+    padding:6px 10px;border-radius:999px;
+    border:1px solid rgba(251,113,133,.35);
+    background:rgba(251,113,133,.12);
+    color:#fecdd3;
+    font-weight:900;
+  }
+
+  /* Toggle Pills */
+  .toggleRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .togglePill{
+    display:flex;align-items:center;gap:10px;
+    border:1px solid rgba(148,163,184,.25);
+    background:rgba(148,163,184,.10);
+    padding:10px 12px;border-radius:999px;
+    width:auto;
+  }
+  .togglePill input{width:auto;margin:0}
+  .togglePill span{font-weight:900}
+</style>
+</head>
+
+<body>
+<main>
+  <div class="hero">
+    <div class="icon">🔒</div>
+    <div>
+      <h1 class="title">Admin</h1>
+      <p class="sub">Login + Einträge verwalten (löschen nur Admin).</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>E-Mail</label>
+    <input id="email" type="email" placeholder="E-Mail eingeben" autocomplete="username" />
+
+    <label>Passwort</label>
+    <input id="pass" type="password" placeholder="Passwort" autocomplete="current-password" />
+
+    <div class="btnRow">
+      <button class="btn btnPrimary" id="loginBtn">Einloggen</button>
+      <button class="btn" id="logoutBtn">Logout</button>
+    </div>
+
+    <div class="btnRow">
+      <button class="btn btnDanger" id="panicLogoutBtn">🚨 Admin-Notfall-Logout</button>
+    </div>
+
+    <div class="muted" id="who">Nicht eingeloggt.</div>
+    <div class="status" id="status"></div>
+
+    <hr class="soft">
+
+    <!-- ✅ Startseiten-Diashow Admin -->
+    <div id="heroAdmin" style="display:none;">
+      <div class="heroGrid">
+        <div>
+          <p class="sectionTitle">🖼️ Startseiten-Diashow</p>
+          <p class="sectionSub">
+            Hier stellst du ein, welche Bilder in der Diashow laufen.
+            Upload/Entfernen gilt nur für „Eigene Bilder“.
+            <br>Neu: Du kannst jedes Bild auch nur „ausblenden“, ohne es zu löschen.
+          </p>
+
+          <div class="toggleRow">
+            <label class="togglePill">
+              <input type="checkbox" id="cfgUseHero">
+              <span>Eigene Bilder</span>
+            </label>
+
+            <label class="togglePill">
+              <input type="checkbox" id="cfgUseEntries">
+              <span>Bilder aus Einträgen</span>
+            </label>
+          </div>
+
+          <div class="btnRow">
+            <button class="btn" id="cfgSaveBtn">💾 Auswahl speichern</button>
+            <button class="btn" id="cfgReloadBtn">🔄 Auswahl neu laden</button>
+          </div>
+
+          <hr class="soft">
+
+          <label>Bild auswählen (JPG/PNG)</label>
+          <input id="heroFile" type="file" accept="image/*" />
+
+          <label>Name (optional)</label>
+          <input id="heroName" type="text" placeholder="z.B. Urlaub 2024" />
+
+          <div class="btnRow">
+            <button class="btn btnPrimary" id="heroUploadBtn">⬆️ Bild hochladen</button>
+            <button class="btn" id="heroReloadBtn">🔄 Liste neu laden</button>
+          </div>
+
+          <div class="btnRow">
+            <button class="btn" id="cleanupBtn">🧹 Kaputte Bilder bereinigen</button>
+            <button class="btn" id="reloadAllBtn">🧩 Diashow-Liste neu laden</button>
+          </div>
+
+          <div class="muted" id="cleanupInfo"></div>
+          <div class="muted" id="heroInfo"></div>
+        </div>
+
+        <div>
+          <p class="sectionTitle">📌 Info</p>
+          <p class="sectionSub">
+            Eigene Bilder: Storage <b>/hero/</b> + Firestore <b>site/heroImages/items</b><br><br>
+            Auswahl: <b>site/heroImagesConfig</b><br><br>
+            Ausblenden: <b>site/heroHidden/urls</b>
+          </p>
+        </div>
+      </div>
+
+      <hr class="soft">
+
+      <!-- ✅ NEU: Gesamte Diashow-Liste (eigene + entries) mit Ausblenden -->
+      <p class="sectionTitle">🎞️ Alle Diashow-Bilder</p>
+      <p class="sectionSub" id="slideshowInfo">Lade…</p>
+      <div class="list" id="slideshowList"></div>
+
+      <hr class="soft">
+
+      <!-- ✅ Eigene Uploads (wie vorher) -->
+      <p class="sectionTitle">🧑‍🎨 Eigene Bilder (Uploads)</p>
+      <p class="sectionSub">Diese kannst du zusätzlich auch löschen.</p>
+      <div class="list" id="heroList"></div>
+
+      <hr class="soft">
+
+      <!-- ✅ NEU: Ausgeblendete Bilder -->
+      <p class="sectionTitle">🙈 Ausgeblendete Bilder</p>
+      <p class="sectionSub" id="hiddenInfo">–</p>
+      <div class="list" id="hiddenList"></div>
+
+      <hr class="soft">
+    </div>
+
+    <div class="btnRow">
+      <button class="btn" id="loadFreund">📗 Freundebuch laden</button>
+      <button class="btn" id="loadGast">📝 Gästebuch laden</button>
+    </div>
+
+    <div class="list" id="list"></div>
+  </div>
+</main>
+
+<a class="homeBtn" href="index.html" title="Zur Startseite">🏠</a>
+
+<script>
+  // ========= Firebase =========
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+  const auth = firebase.auth();
+
+  const ADMIN_EMAIL = "male01.w@gmail.com";
+
+  const el = (id) => document.getElementById(id);
+  const statusEl = el("status");
+  const whoEl = el("who");
+  const listEl = el("list");
+
+  // Slideshow Admin
+  const heroAdminEl = el("heroAdmin");
+  const heroFileEl = el("heroFile");
+  const heroNameEl = el("heroName");
+  const heroUploadBtn = el("heroUploadBtn");
+  const heroReloadBtn = el("heroReloadBtn");
+  const heroInfoEl = el("heroInfo");
+  const heroListEl = el("heroList");
+
+  // Auto-cleanup
+  const cleanupBtn = el("cleanupBtn");
+  const cleanupInfoEl = el("cleanupInfo");
+
+  // Config UI
+  const cfgUseHeroEl = el("cfgUseHero");
+  const cfgUseEntriesEl = el("cfgUseEntries");
+  const cfgSaveBtn = el("cfgSaveBtn");
+  const cfgReloadBtn = el("cfgReloadBtn");
+
+  // ✅ NEU: Gesamtliste + Hidden
+  const reloadAllBtn = el("reloadAllBtn");
+  const slideshowInfoEl = el("slideshowInfo");
+  const slideshowListEl = el("slideshowList");
+  const hiddenInfoEl = el("hiddenInfo");
+  const hiddenListEl = el("hiddenList");
+
+  const cfgRef = db.collection("site").doc("heroImagesConfig");
+  const hiddenCol = db.collection("site").doc("heroHidden").collection("urls");
+
+  function esc(s){
+    return String(s ?? "").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[m]));
+  }
+
+  function setStatus(msg, type){
+    statusEl.className = "status " + (type || "");
+    statusEl.textContent = msg || "";
+  }
+
+  function isAdmin(user){
+    return !!user && (user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }
+  // ====== HIDE / UNHIDE (Diashow) ======
+function hashIdFromUrl(url) {
+  // FNV-1a (kurz & stabil)
+  let h = 2166136261;
+  for (let i = 0; i < url.length; i++) {
+    h ^= url.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return "u_" + (h >>> 0).toString(16);
+}
+
+function hiddenRefForUrl(url) {
+  const id = hashIdFromUrl(url);
+  return db.collection("site").doc("heroHidden").collection("urls").doc(id);
+}
+
+async function setHidden(url, hidden) {
+  const user = auth.currentUser;
+  if (!isAdmin(user)) return;
+  
+  const ref = hiddenRefForUrl(url);
+  
+  if (hidden) {
+    await ref.set({
+      url,
+      hidden: true,
+      updated: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } else {
+    await ref.delete();
+  }
+}
+
+async function loadHiddenSet() {
+  const set = new Set();
+  const snap = await db.collection("site")
+    .doc("heroHidden")
+    .collection("urls")
+    .limit(2000)
+    .get();
+  
+  snap.docs.forEach(d => {
+    const url = (d.data() || {}).url;
+    if (url) set.add(url);
+  });
+  return set;
+}
+
+  function setCleanupInfo(msg) {
+    if (cleanupInfoEl) cleanupInfoEl.textContent = msg || "";
+  }
+
+  function setHeroInfo(msg){ heroInfoEl.textContent = msg || ""; }
+
+  function formatDate(ts){
+    try{
+      const d = ts?.toDate ? ts.toDate() : new Date();
+      return d.toLocaleString("de-DE");
+    }catch{ return ""; }
+  }
+
+  // ========= Helpers: Hidden Doc-ID aus URL =========
+  function makeHiddenDocId(url){
+    // btoa kann kein unicode -> über encodeURIComponent absichern
+    const s = encodeURIComponent(String(url));
+    const b64 = btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    return b64.slice(0, 1500); // sehr sicher unter Firestore-Grenzen
+  }
+
+  async function setHidden(url, hide){
+    const user = auth.currentUser;
+    if(!isAdmin(user)) throw new Error("Nur Admin.");
+
+    const id = makeHiddenDocId(url);
+    const ref = hiddenCol.doc(id);
+
+    if(hide){
+      await ref.set({
+        url: String(url),
+        hiddenAt: firebase.firestore.FieldValue.serverTimestamp(),
+        by: user.email || null
+      }, { merge: true });
+    } else {
+      await ref.delete();
+    }
+  }
+
+  async function loadHiddenSet(){
+    const set = new Set();
+    try{
+      const snap = await hiddenCol.limit(2000).get();
+      snap.docs.forEach(d => {
+        const data = d.data() || {};
+        if(data.url) set.add(String(data.url));
+      });
+    }catch(e){
+      console.warn("Hidden load failed:", e);
+    }
+    return set;
+  }
+
+  // ========= URL-Test: lädt als Image -> ok/kaputt =========
+  function checkImageUrl(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      let done = false;
+
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        img.onload = null;
+        img.onerror = null;
+        resolve(ok);
+      };
+
+      img.onload = () => finish(true);
+      img.onerror = () => finish(false);
+
+      const u = new URL(url, location.href);
+      u.searchParams.set("_v", String(Date.now()));
+      img.src = u.toString();
+
+      setTimeout(() => finish(false), 8000);
+    });
+  }
+
+  // 🧹 bereinigt Hero-Uploads (site/heroImages/items)
+  async function cleanupBrokenHeroItems() {
+    const user = auth.currentUser;
+    if (!isAdmin(user)) return { checked: 0, removed: 0 };
+
+    const snap = await db.collection("site")
+      .doc("heroImages")
+      .collection("items")
+      .orderBy("created", "desc")
+      .limit(200)
+      .get();
+
+    const items = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }))
+      .filter(x => x.url);
+
+    let removed = 0;
+    let checked = 0;
+
+    for (const it of items) {
+      checked++;
+      const ok = await checkImageUrl(it.url);
+
+      if (!ok) {
+        try {
+          if (it.storagePath) await storage.ref(it.storagePath).delete();
+          else await storage.refFromURL(it.url).delete();
+        } catch (e) {}
+
+        try {
+          await db.collection("site").doc("heroImages").collection("items").doc(it.id).delete();
+        } catch (e) {}
+
+        removed++;
+      }
+    }
+
+    return { checked, removed };
+  }
+
+  // 🧹 bereinigt Entry-Bilder (entries.imageUrl) -> entfernt nur den Link im Doc
+  async function cleanupBrokenEntryImages() {
+    const user = auth.currentUser;
+    if (!isAdmin(user)) return { checked: 0, fixed: 0 };
+
+    const snap = await db.collection("entries")
+      .orderBy("created", "desc")
+      .limit(500)
+      .get();
+
+    const docs = snap.docs
+      .map(d => ({ id: d.id, ref: d.ref, ...(d.data() || {}) }))
+      .filter(x => x.imageUrl);
+
+    let checked = 0;
+    let fixed = 0;
+
+    for (const d of docs) {
+      checked++;
+      const ok = await checkImageUrl(d.imageUrl);
+
+      if (!ok) {
+        try {
+          await d.ref.update({
+            imageUrl: firebase.firestore.FieldValue.delete()
+          });
+          fixed++;
+        } catch (e) {}
+      }
+    }
+
+    return { checked, fixed };
+  }
+
+  async function runAutoCleanup() {
+    const user = auth.currentUser;
+    if (!isAdmin(user)) {
+      setCleanupInfo("❌ Nur Admin.");
+      return;
+    }
+
+    setCleanupInfo("⏳ Prüfe Bilder…");
+
+    try {
+      const a = await cleanupBrokenHeroItems();
+      const b = await cleanupBrokenEntryImages();
+
+      setCleanupInfo(
+        `✅ Fertig. Hero geprüft: ${a.checked}, entfernt: ${a.removed}. ` +
+        `Entries geprüft: ${b.checked}, repariert: ${b.fixed}.`
+      );
+
+      await loadHeroImages();
+      await loadSlideshowAll();
+      await loadHiddenList();
+    } catch (e) {
+      setCleanupInfo("❌ Fehler: " + (e?.message || e));
+    }
+  }
+
+  // ========= Auth State =========
+  auth.onAuthStateChanged((user) => {
+  if (user) {
+    whoEl.textContent =
+      "Eingeloggt: " + user.email + (isAdmin(user) ? " (Admin)" : " (kein Admin)");
+    
+    setStatus(
+      isAdmin(user) ? "✅ Admin aktiv." : "⚠️ Du bist nicht als Admin eingeloggt.",
+      isAdmin(user) ? "ok" : "err"
+    );
+    
+    if (isAdmin(user)) {
+      heroAdminEl.style.display = "block";
+      
+      loadHeroConfig(); // ✅ Checkboxen laden
+      loadHeroImages(); // ✅ Alle Bilder + Ausblenden-Buttons laden
+      
+      // optional:
+      runAutoCleanup();
+    } else {
+      heroAdminEl.style.display = "none";
+    }
+  } else {
+    whoEl.textContent = "Nicht eingeloggt.";
+    setStatus("", "");
+    heroAdminEl.style.display = "none";
+  }
+});
+
+  // ========= Login / Logout =========
+  el("loginBtn").addEventListener("click", async () => {
+    const email = el("email").value.trim();
+    const pass = el("pass").value;
+
+    if(!email || !pass){
+      setStatus("❌ Bitte E-Mail + Passwort eingeben.", "err");
+      return;
+    }
+
+    setStatus("⏳ Login…", "");
+    try{
+      const cred = await auth.signInWithEmailAndPassword(email, pass);
+      if(!isAdmin(cred.user)){
+        setStatus("❌ Eingeloggt, aber nicht Admin. Logout und mit Admin-Mail einloggen.", "err");
+      } else {
+        setStatus("✅ Eingeloggt.", "ok");
+      }
+    }catch(e){
+      setStatus("❌ Login-Fehler: " + (e?.message || e), "err");
+    }
+  });
+
+  el("logoutBtn").addEventListener("click", async () => {
+    try{
+      await auth.signOut();
+      setStatus("✅ Ausgeloggt.", "ok");
+      listEl.innerHTML = "";
+      heroListEl.innerHTML = "";
+      slideshowListEl.innerHTML = "";
+      hiddenListEl.innerHTML = "";
+      heroInfoEl.textContent = "";
+      cleanupInfoEl.textContent = "";
+    }catch(e){
+      setStatus("❌ Logout-Fehler: " + (e?.message || e), "err");
+    }
+  });
+
+  // ========= Admin-Notfall-Logout =========
+  const SESSION_KEY = "fb_pass_ok_at";
+  const ADMIN_KILL_KEY = "fb_admin_kill_at";
+
+  async function adminEmergencyLogout(){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      alert("❌ Nur Admin darf den Notfall-Logout auslösen.");
+      return;
+    }
+
+    try{ await auth.signOut(); }catch(e){}
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+    try{ localStorage.setItem(ADMIN_KILL_KEY, String(Date.now())); }catch(e){}
+
+    location.replace("index.html");
+  }
+
+  el("panicLogoutBtn").addEventListener("click", () => {
+    if(confirm("Admin sofort ausloggen und Passwort-Session löschen?")){
+      adminEmergencyLogout();
+    }
+  });
+
+  // ========= Config (useHero / useEntries) =========
+  async function loadHeroConfig() {
+  if (!isAdmin(auth.currentUser)) return;
+  try {
+    const snap = await cfgRef.get();
+    
+    // ✅ Defaults: beide AN, wenn Doc nicht existiert
+    let useHero = true;
+    let useEntries = true;
+    
+    if (snap.exists) {
+      const d = snap.data() || {};
+      useHero = d.useHero !== false;
+      useEntries = d.useEntries !== false;
+    }
+    
+    cfgUseHeroEl.checked = useHero;
+    cfgUseEntriesEl.checked = useEntries;
+  } catch (e) {
+    console.warn("config load failed:", e);
+  }
+}
+
+  async function saveHeroConfig(){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      alert("Nur Admin.");
+      return;
+    }
+
+    cfgSaveBtn.disabled = true;
+    try{
+      await cfgRef.set({
+        useHero: !!cfgUseHeroEl.checked,
+        useEntries: !!cfgUseEntriesEl.checked,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      alert("✅ Auswahl gespeichert.");
+      await loadSlideshowAll();
+    }catch(e){
+      alert("❌ Speichern fehlgeschlagen: " + (e?.message || e));
+    }finally{
+      cfgSaveBtn.disabled = false;
+    }
+  }
+
+  cfgSaveBtn.addEventListener("click", saveHeroConfig);
+  cfgReloadBtn.addEventListener("click", loadHeroConfig);
+
+  // ========= Eigene Uploads: Liste =========
+  async function loadHeroImages(){
+  if(!isAdmin(auth.currentUser)) return;
+
+  heroListEl.innerHTML = "⏳ Lade Bilder…";
+  setHeroInfo("");
+
+  try{
+    const hiddenSet = await loadHiddenSet();
+
+    // Config (Quellen)
+    let useHero = true, useEntries = true;
+    try{
+      const cfgSnap = await db.collection("site").doc("heroImagesConfig").get();
+      if(cfgSnap.exists){
+        const cfg = cfgSnap.data() || {};
+        useHero = cfg.useHero !== false;
+        useEntries = cfg.useEntries !== false;
+      }
+    }catch(e){}
+
+    // 1) Eigene Bilder
+    let heroItems = [];
+    if(useHero){
+      const snap = await db.collection("site")
+        .doc("heroImages")
+        .collection("items")
+        .orderBy("created", "desc")
+        .limit(200)
+        .get();
+
+      heroItems = snap.docs.map(d => ({ id:d.id, ...(d.data()||{}) }))
+        .filter(x => x.url)
+        .map(x => ({
+          source: "hero",
+          name: x.name || "Eigenes Bild",
+          url: x.url,
+          created: x.created,
+          heroDocId: x.id
+        }));
+    }
+
+    // 2) Entry-Bilder
+    let entryItems = [];
+    if(useEntries){
+      const snap = await db.collection("entries")
+        .orderBy("created","desc")
+        .limit(500)
+        .get();
+
+      entryItems = snap.docs
+        .map(d => ({ id:d.id, ...(d.data()||{}) }))
+        .filter(x => x.imageUrl)
+        .map(x => ({
+          source: "entry",
+          name: "Einträge",
+          url: x.imageUrl,
+          entryId: x.id,
+          entryType: x.type || ""
+        }));
+    }
+
+    // Zusammenführen + Duplikate
+    const all = [...heroItems, ...entryItems];
+    const seen = new Set();
+    const items = all.filter(x => {
+      if(seen.has(x.url)) return false;
+      seen.add(x.url);
+      return true;
+    });
+
+    if(!items.length){
+      heroListEl.innerHTML = "<div class='muted'>Keine Bilder gefunden (oder Quellen deaktiviert).</div>";
+      setHeroInfo("0 Bilder.");
+      return;
+    }
+
+    setHeroInfo(items.length + " Bilder (gesamt).");
+
+    heroListEl.innerHTML = `
+      <div class="thumbGrid">
+        ${items.map(x => renderAnyThumb(x, hiddenSet.has(x.url))).join("")}
+      </div>
+    `;
+  }catch(e){
+    heroListEl.innerHTML = "";
+    setHeroInfo("❌ Fehler beim Laden: " + (e?.message || e));
+  }
+}
+
+function renderAnyThumb(x, isHidden){
+  const tag = x.source === "hero" ? "Eigene Bilder" : "Einträge";
+  const url = esc(x.url);
+  const hideLabel = isHidden ? "👁️ Einblenden" : "🚫 Ausblenden";
+  const hideAction = isHidden ? `unhideUrl('${url}')` : `hideUrl('${url}')`;
+
+  const deleteBtn = (x.source === "hero" && x.heroDocId)
+    ? `<button class="miniBtn" onclick="deleteHeroImage('${esc(x.heroDocId)}')">🗑️</button>`
+    : "";
+
+  const meta2 = x.source === "entry"
+    ? `<div class="mini">${esc(x.entryType || "")} • Entry-ID: ${esc(x.entryId || "")}</div>`
+    : `<div class="mini">${x.created?.toDate ? esc(x.created.toDate().toLocaleString("de-DE")) : ""}</div>`;
+
+  return `
+    <div class="thumb">
+      <img src="${url}" alt="">
+      <div class="thumbMeta">
+        <div>
+          <div class="thumbName">${esc(tag)}</div>
+          ${meta2}
+          <div class="mini">${isHidden ? "🚫 Ausgeblendet" : "✅ Sichtbar"}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="miniBtn" onclick="${hideAction}">${hideLabel}</button>
+          ${deleteBtn}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Global für onclick
+window.hideUrl = async (url) => {
+  try{
+    await setHidden(url, true);
+    await loadHeroImages();
+  }catch(e){ alert("Fehler: " + (e?.message || e)); }
+};
+
+window.unhideUrl = async (url) => {
+  try{
+    await setHidden(url, false);
+    await loadHeroImages();
+  }catch(e){ alert("Fehler: " + (e?.message || e)); }
+};
+
+  async function uploadHeroImage(){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      setHeroInfo("❌ Nur Admin.");
+      return;
+    }
+
+    const file = heroFileEl.files[0];
+    if(!file){
+      setHeroInfo("❌ Bitte zuerst ein Bild auswählen.");
+      return;
+    }
+
+    heroUploadBtn.disabled = true;
+    setHeroInfo("⏳ Upload läuft…");
+
+    try{
+      const safeName = (file.name || "bild").replace(/\s+/g, "_");
+      const stamp = Date.now();
+      const path = "hero/" + stamp + "_" + safeName;
+
+      const ref = storage.ref(path);
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+
+      const name = (heroNameEl.value || "").trim() || safeName;
+      await db.collection("site").doc("heroImages").collection("items").add({
+        url,
+        storagePath: path,
+        name,
+        created: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      heroFileEl.value = "";
+      heroNameEl.value = "";
+
+      setHeroInfo("✅ Hochgeladen!");
+      await loadHeroImages();
+      await loadSlideshowAll();
+    }catch(e){
+      setHeroInfo("❌ Upload-Fehler: " + (e?.message || e));
+    }finally{
+      heroUploadBtn.disabled = false;
+    }
+  }
+
+  async function deleteHeroImage(id){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      alert("Nur Admin.");
+      return;
+    }
+    if(!confirm("Bild wirklich löschen?")) return;
+
+    setHeroInfo("⏳ Lösche…");
+
+    try{
+      const docRef = db.collection("site").doc("heroImages").collection("items").doc(id);
+      const snap = await docRef.get();
+      if(!snap.exists){
+        setHeroInfo("⚠️ Bild existiert nicht mehr.");
+        await loadHeroImages();
+        return;
+      }
+
+      const data = snap.data() || {};
+      const storagePath = data.storagePath || "";
+
+      if(storagePath){
+        try{ await storage.ref(storagePath).delete(); }catch(e){}
+      } else if (data.url) {
+        try{ await storage.refFromURL(data.url).delete(); }catch(e){}
+      }
+
+      await docRef.delete();
+
+      setHeroInfo("✅ Gelöscht.");
+      await loadHeroImages();
+      await loadSlideshowAll();
+    }catch(e){
+      setHeroInfo("❌ Löschen fehlgeschlagen: " + (e?.message || e));
+    }
+  }
+
+  heroUploadBtn.addEventListener("click", uploadHeroImage);
+  heroReloadBtn.addEventListener("click", async () => { await loadHeroImages(); await loadSlideshowAll(); await loadHiddenList(); });
+  cleanupBtn.addEventListener("click", runAutoCleanup);
+
+  // ========= NEU: Gesamtliste Diashow (eigene + entries) =========
+  async function loadSlideshowAll(){
+    if(!isAdmin(auth.currentUser)) return;
+
+    slideshowInfoEl.textContent = "⏳ Lade…";
+    slideshowListEl.innerHTML = "⏳ Lade…";
+
+    try{
+      // config lesen
+      let useHero = true;
+      let useEntries = true;
+      try{
+        const cfgSnap = await cfgRef.get();
+        if(cfgSnap.exists){
+          const cfg = cfgSnap.data() || {};
+          useHero = cfg.useHero !== false;
+          useEntries = cfg.useEntries !== false;
+        }
+      }catch(e){}
+
+      const hiddenSet = await loadHiddenSet();
+
+      let urls = [];
+
+      if(useHero){
+        const heroSnap = await db.collection("site").doc("heroImages").collection("items")
+          .orderBy("created", "desc").limit(50).get();
+
+        heroSnap.docs.forEach(d => {
+          const data = d.data() || {};
+          if(data.url) urls.push({ url: String(data.url), source: "Eigene Bilder" });
+        });
+      }
+
+      if(useEntries){
+        const entrySnap = await db.collection("entries")
+          .orderBy("created","desc").limit(500).get();
+
+        entrySnap.docs.forEach(d => {
+          const data = d.data() || {};
+          if(data.imageUrl) urls.push({ url: String(data.imageUrl), source: "Einträge" });
+        });
+      }
+
+      // unique nach URL
+      const seen = new Set();
+      const unique = [];
+      for(const x of urls){
+        if(seen.has(x.url)) continue;
+        seen.add(x.url);
+        unique.push(x);
+      }
+
+      if(!unique.length){
+        slideshowListEl.innerHTML = "<div class='muted'>Keine Bilder aus den gewählten Quellen.</div>";
+        slideshowInfoEl.textContent = "0 Bilder.";
+        return;
+      }
+
+      slideshowInfoEl.textContent =
+        `${unique.length} Bilder gesamt • ${Array.from(hiddenSet).length} ausgeblendet`;
+
+      slideshowListEl.innerHTML = `
+        <div class="thumbGrid">
+          ${unique.map(x => renderSlideshowThumb(x, hiddenSet.has(x.url))).join("")}
+        </div>
+      `;
+    }catch(e){
+      slideshowListEl.innerHTML = "";
+      slideshowInfoEl.textContent = "❌ Fehler: " + (e?.message || e);
+    }
+  }
+
+  function renderSlideshowThumb(x, isHidden){
+    return `
+      <div class="thumb">
+        <img src="${esc(x.url)}" alt="Diashow">
+        <div class="thumbMeta">
+          <div>
+            <div class="thumbName">
+              ${esc(x.source)} ${isHidden ? `<span class="tagHidden">🙈 ausgeblendet</span>` : ""}
+            </div>
+            <div class="mini">${esc(x.url)}</div>
+          </div>
+          <div class="miniBtns">
+            <button class="miniBtn ${isHidden ? "miniBtnOk" : ""}" onclick="toggleHideUrl('${esc(x.url)}', ${isHidden ? "false" : "true"})">
+              ${isHidden ? "👁️ Einblenden" : "🙈 Ausblenden"}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ========= NEU: Hidden-Liste anzeigen =========
+  async function loadHiddenList(){
+    if(!isAdmin(auth.currentUser)) return;
+
+    hiddenInfoEl.textContent = "⏳ Lade…";
+    hiddenListEl.innerHTML = "⏳ Lade…";
+
+    try{
+      const snap = await hiddenCol.limit(2000).get();
+      const items = snap.docs.map(d => ({ id: d.id, ...(d.data()||{}) })).filter(x => x.url);
+
+      hiddenInfoEl.textContent = items.length ? `${items.length} ausgeblendete Bilder` : "0 ausgeblendete Bilder";
+      if(!items.length){
+        hiddenListEl.innerHTML = "<div class='muted'>Nichts ausgeblendet.</div>";
+        return;
+      }
+
+      hiddenListEl.innerHTML = `
+        <div class="thumbGrid">
+          ${items.map(renderHiddenThumb).join("")}
+        </div>
+      `;
+    }catch(e){
+      hiddenInfoEl.textContent = "❌ Fehler: " + (e?.message || e);
+      hiddenListEl.innerHTML = "";
+    }
+  }
+
+  function renderHiddenThumb(x){
+    const when = x.hiddenAt?.toDate ? x.hiddenAt.toDate().toLocaleString("de-DE") : "";
+    const by = x.by ? (" • " + x.by) : "";
+    return `
+      <div class="thumb">
+        <img src="${esc(x.url)}" alt="ausgeblendet">
+        <div class="thumbMeta">
+          <div>
+            <div class="thumbName"><span class="tagHidden">🙈 ausgeblendet</span></div>
+            <div class="mini">${esc(when + by)}</div>
+          </div>
+          <div class="miniBtns">
+            <button class="miniBtn miniBtnOk" onclick="toggleHideUrl('${esc(x.url)}', false)">👁️ Einblenden</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ✅ Globale Funktion für Buttons
+  async function toggleHideUrl(url, hide){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      alert("Nur Admin.");
+      return;
+    }
+    try{
+      await setHidden(url, hide);
+      await loadHeroImages();
+      await loadSlideshowAll();
+      await loadHiddenList();
+    }catch(e){
+      alert("❌ Fehler: " + (e?.message || e));
+    }
+  }
+  window.toggleHideUrl = toggleHideUrl;
+  window.deleteHeroImage = deleteHeroImage;
+
+  reloadAllBtn.addEventListener("click", async () => {
+    await loadSlideshowAll();
+    await loadHiddenList();
+    await loadHeroImages();
+  });
+
+  // ========= Laden & Render (Einträge) =========
+  async function loadType(type){
+    setStatus("⏳ Lade " + type + "…", "");
+    listEl.innerHTML = "⏳ Lade…";
+
+    try{
+      const snap = await db.collection("entries")
+        .orderBy("created","desc")
+        .limit(200)
+        .get();
+
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(d => d.type === type);
+
+      if(!items.length){
+        listEl.innerHTML = "<div class='muted'>Noch keine Einträge.</div>";
+        setStatus("✅ Keine Einträge gefunden.", "ok");
+        return;
+      }
+
+      listEl.innerHTML = items.map(d => renderEntry(d)).join("");
+      setStatus("✅ Geladen: " + items.length + " Einträge.", "ok");
+    }catch(e){
+      listEl.innerHTML = "";
+      setStatus("❌ Fehler beim Laden: " + (e?.message || e), "err");
+    }
+  }
+
+  function renderEntry(d){
+    const a = d.answers || {};
+    const name = a.name || a.fb_name || a.gb_name || "Unbekannt";
+    const time = formatDate(d.created);
+
+    const preview = Object.entries(a).slice(0, 6).map(([k,v]) =>
+      `<div class="q">${esc(k)}</div><div class="a">${esc(v)}</div>`
+    ).join("");
+
+    return `
+      <div class="entry" data-id="${esc(d.id)}">
+        <div class="row">
+          <div>
+            <p class="name">${esc(name)}</p>
+            <div class="meta">${esc(time)} • <span class="pill">${esc(d.type)}</span></div>
+          </div>
+          <div class="row" style="gap:8px">
+            <button class="btn btnDanger" onclick="deleteEntry('${esc(d.id)}')" style="min-width:160px">🗑️ Löschen</button>
+          </div>
+        </div>
+
+        ${d.imageUrl ? `<img src="${esc(d.imageUrl)}" alt="Foto">` : ""}
+        ${preview}
+      </div>
+    `;
+  }
+
+  async function deleteEntry(docId){
+    const user = auth.currentUser;
+    if(!isAdmin(user)){
+      setStatus("❌ Löschen nur als Admin.", "err");
+      return;
+    }
+    if(!confirm("Wirklich löschen? (Dokument + ggf. Bild)")) return;
+
+    setStatus("⏳ Lösche…", "");
+
+    try{
+      const ref = db.collection("entries").doc(docId);
+      const snap = await ref.get();
+      if(!snap.exists){
+        setStatus("⚠️ Eintrag existiert nicht mehr.", "err");
+        return;
+      }
+
+      const data = snap.data() || {};
+      const imageUrl = data.imageUrl || "";
+
+      if(imageUrl){
+        try{
+          const storageRef = storage.refFromURL(imageUrl);
+          await storageRef.delete();
+        }catch(imgErr){
+          console.warn("Bild löschen fehlgeschlagen:", imgErr);
+        }
+      }
+
+      await ref.delete();
+
+      const node = document.querySelector(`.entry[data-id="${CSS.escape(docId)}"]`);
+      if(node) node.remove();
+
+      setStatus("✅ Gelöscht.", "ok");
+
+      // Diashow Listen aktualisieren
+      await loadSlideshowAll();
+      await loadHiddenList();
+    }catch(e){
+      setStatus("❌ Löschen fehlgeschlagen: " + (e?.message || e), "err");
+    }
+  }
+
+  el("loadFreund").addEventListener("click", () => loadType("freundebuch"));
+  el("loadGast").addEventListener("click", () => loadType("gaestebuch"));
+  window.deleteEntry = deleteEntry;
+</script>
+</body>
+</html>
