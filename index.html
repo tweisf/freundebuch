@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freundebuch / Gästebuch</title>
+
+<!-- Firebase (für Slideshow + Counter) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#f8fafc}
+main{max-width:820px;margin:auto;padding:20px}
+.card{background:#020617;border:1px solid #1e293b;border-radius:16px;padding:16px;margin-bottom:16px}
+h1{margin:0 0 10px}
+p{margin:0 0 14px;color:#94a3b8;line-height:1.4}
+
+.grid{display:grid;gap:12px}
+@media (min-width:720px){.grid{grid-template-columns:1fr 1fr}}
+
+.btn{
+  display:block;padding:16px;border-radius:16px;
+  border:1px solid #334155;background:#020617;color:#f8fafc;text-decoration:none
+}
+.btn:hover{border-color:#475569}
+.btnTitle{font-weight:900;font-size:18px;margin-bottom:6px}
+.btnSub{color:#94a3b8;font-size:13px}
+
+.accentA{background:linear-gradient(135deg,rgba(99,102,241,.28),rgba(34,211,238,.16))}
+.accentB{background:linear-gradient(135deg,rgba(52,211,153,.22),rgba(96,165,250,.16))}
+
+.adminDot{
+  position:fixed;right:10px;bottom:10px;width:12px;height:12px;
+  border-radius:50%;background:#334155;opacity:.5;z-index:1000
+}
+.adminDot:hover{opacity:1;background:#64748b}
+
+/* Logout Button (klein & unauffällig) */
+.logoutBtn{
+  position:fixed;left:10px;bottom:10px;z-index:1000;
+  font-size:12px;padding:6px 10px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.40);
+  color:#cbd5e1;
+  cursor:pointer;
+  opacity:.75;
+}
+.logoutBtn:hover{opacity:1}
+
+/* Passwort Overlay */
+#lockOverlay{
+  position:fixed; inset:0; z-index:9999;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(2,6,23,.88);
+  backdrop-filter: blur(10px);
+}
+#lockCard{
+  width:min(420px,92vw);
+  background:#020617;
+  border:1px solid #1e293b;
+  border-radius:18px;
+  padding:16px;
+  color:#f8fafc;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+}
+#lockTitle{font-size:20px;font-weight:900;margin-bottom:6px;}
+#lockSub{color:#94a3b8;font-size:13px;margin-bottom:12px;}
+#pwInput{
+  width:100%; padding:12px; border-radius:14px;
+  border:1px solid #334155; background:#0b1220; color:#f8fafc;
+  outline:none;
+}
+#pwBtn{
+  width:100%; margin-top:10px; padding:12px; border-radius:14px;
+  border:none; font-weight:900; cursor:pointer;
+  background:linear-gradient(135deg,#60a5fa,#a78bfa); color:#06122a;
+}
+#pwMsg{margin-top:10px; font-weight:900; color:#fb7185; display:none;}
+
+/* ===== Slideshow + Live Counter ===== */
+.heroWrap{margin-top:14px}
+.heroFrame{
+  border-radius:16px; overflow:hidden;
+  border:1px solid #1e293b;
+  background:rgba(2,6,23,.55);
+
+  /* ✅ Neu: feste "Bühne", damit contain sauber wirkt */
+  height: clamp(220px, 32vh, 360px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ✅ Neu: Original-Seitenverhältnis, KEIN Cropping */
+.heroImg{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit: contain;     /* 🔥 wichtig */
+  background:#020617;      /* hübsche Ränder, wenn Bild nicht füllt */
+}
+
+.heroMeta{
+  display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  margin-top:10px;
+  color:#94a3b8;
+  font-size:13px;
+}
+.pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:999px;
+  border:1px solid rgba(148,163,184,.25);
+  background:rgba(148,163,184,.10);
+  color:#e5e7eb;
+  font-size:12px;
+  font-weight:800;
+}
+.statsGrid{
+  display:grid; gap:10px; margin-top:12px;
+}
+@media (min-width:720px){ .statsGrid{grid-template-columns:1fr 1fr 1fr} }
+.stat{
+  border:1px solid rgba(148,163,184,.18);
+  background:rgba(15,23,42,.35);
+  border-radius:14px;
+  padding:12px;
+}
+.stat .k{color:#94a3b8;font-size:12px}
+.stat .v{font-weight:900;font-size:22px;margin-top:4px}
+.smallNote{color:#94a3b8;font-size:12px;margin-top:10px}
+</style>
+</head>
+
+<body>
+
+<!-- Passwort-Sperre -->
+<div id="lockOverlay">
+  <div id="lockCard">
+    <div id="lockTitle">🔒 Zugang</div>
+    <div id="lockSub">Bitte Passwort eingeben, um fortzufahren.</div>
+
+    <input id="pwInput" type="password" inputmode="numeric" placeholder="Passwort">
+    <button id="pwBtn">Weiter</button>
+
+    <div id="pwMsg">❌ Falsches Passwort</div>
+  </div>
+</div>
+
+<main>
+  <div class="card">
+    <h1>Willkommen ✨</h1>
+    <p>Wähle aus, wo du dich eintragen willst.</p>
+
+    <div class="grid">
+      <a class="btn accentA" href="freundebuch.html">
+        <div class="btnTitle">📘 Freundebuch</div>
+        <div class="btnSub">Locker, erwachsen, mit Auswahlspiel</div>
+      </a>
+
+      <a class="btn accentB" href="gaestebuch.html">
+        <div class="btnTitle">📝 Gästebuch</div>
+        <div class="btnSub">Anlass, Emoji, Lieblingsmoment</div>
+      </a>
+    </div>
+
+    <!-- ✅ NEU: Slideshow + Live Counter -->
+    <div class="heroWrap" id="heroWrap" style="display:none;">
+      <div class="heroFrame">
+        <img id="heroImg" class="heroImg" alt="Mia & Tizian">
+      </div>
+
+      <div class="heroMeta">
+        <span class="pill">🖼️ Diashow</span>
+        <span class="pill" id="heroPos">– / –</span>
+      </div>
+
+      <div class="statsGrid">
+        <div class="stat">
+          <div class="k">📘 Freundebuch-Einträge</div>
+          <div class="v" id="cntFreund">–</div>
+        </div>
+        <div class="stat">
+          <div class="k">📝 Gästebuch-Einträge</div>
+          <div class="v" id="cntGast">–</div>
+        </div>
+        <div class="stat">
+          <div class="k">❤️ Likes gesamt</div>
+          <div class="v" id="cntLikes">–</div>
+        </div>
+      </div>
+
+      <div class="smallNote" id="cntNote">Live-Stand wird geladen…</div>
+    </div>
+
+  </div>
+</main>
+
+<a href="admin.html" class="adminDot" title="Admin"></a>
+<button class="logoutBtn" id="logoutBtn" type="button">🔒 Logout</button>
+
+<script>
+(function(){
+  const CORRECT = "1234";
+
+  // ✅ 1h Session (wie besprochen)
+  const SESSION_KEY = "fb_pass_ok_at";
+  const TTL_MS = 60 * 60 * 1000;
+
+  const overlay = document.getElementById("lockOverlay");
+  const input = document.getElementById("pwInput");
+  const btn = document.getElementById("pwBtn");
+  const msg = document.getElementById("pwMsg");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  function isSessionValid() {
+    const t = Number(localStorage.getItem(SESSION_KEY) || 0);
+    return t && (Date.now() - t) < TTL_MS;
+  }
+
+  function setSessionNow() {
+    localStorage.setItem(SESSION_KEY, String(Date.now()));
+  }
+
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  function hideLock(){
+    overlay.style.display = "none";
+    msg.style.display = "none";
+  }
+
+  function showLock(){
+    overlay.style.display = "flex";
+    msg.style.display = "none";
+    input.value = "";
+    setTimeout(()=>input.focus(), 50);
+  }
+
+  // optional: Logout per URL-Parameter: index.html?logout=1
+  const url = new URL(location.href);
+  if (url.searchParams.get("logout") === "1") {
+    clearSession();
+    url.searchParams.delete("logout");
+    history.replaceState({}, "", url.toString());
+  }
+
+  // Session prüfen
+  if (isSessionValid()){
+    hideLock();
+  } else {
+    showLock();
+  }
+
+  function unlock(){
+    const val = (input.value || "").trim();
+    if(val === CORRECT){
+      setSessionNow();
+      hideLock();
+    } else {
+      msg.style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  btn.addEventListener("click", unlock);
+  input.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") unlock();
+  });
+
+  // Logout: sperrt wieder
+  logoutBtn.addEventListener("click", () => {
+    if(confirm("Wirklich ausloggen?")){
+      clearSession();
+      showLock();
+    }
+  });
+})();
+</script>
+
+<script>
+  // ========= Firebase (Slideshow + Counter) =========
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLnz3t9VcQJLg2oqbZd2cA7-hXF30UyHM",
+    authDomain: "freundebuch-neu.firebaseapp.com",
+    projectId: "freundebuch-neu",
+    storageBucket: "freundebuch-neu.firebasestorage.app",
+    messagingSenderId: "732597691942",
+    appId: "1:732597691942:web:2c116f530c4179d1c2a8e7"
+  };
+
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const heroWrap = document.getElementById("heroWrap");
+  const heroImg = document.getElementById("heroImg");
+  const heroPos = document.getElementById("heroPos");
+
+  const cntFreund = document.getElementById("cntFreund");
+  const cntGast = document.getElementById("cntGast");
+  const cntLikes = document.getElementById("cntLikes");
+  const cntNote = document.getElementById("cntNote");
+
+  // ========= Slideshow =========
+  let heroItems = []; // [{id,url}]
+  let heroIndex = 0;
+  let heroTimer = null;
+
+  function showHero(i){
+    if(!heroItems.length) return;
+    heroIndex = (i + heroItems.length) % heroItems.length;
+    heroImg.src = heroItems[heroIndex].url;
+    heroPos.textContent = (heroIndex + 1) + " / " + heroItems.length;
+  }
+
+  function startHero(){
+    if(heroTimer) clearInterval(heroTimer);
+    if(heroItems.length <= 1) return;
+    heroTimer = setInterval(() => showHero(heroIndex + 1), 30000); // 30 Sekunden
+  }
+
+  async function loadHeroImages(){
+    try{
+      const snap = await db.collection("site")
+        .doc("heroImages")
+        .collection("items")
+        .orderBy("created", "desc")
+        .limit(50)
+        .get();
+
+      heroItems = snap.docs
+        .map(d => ({ id: d.id, ...(d.data() || {}) }))
+        .filter(x => x.url);
+
+      if(!heroItems.length){
+        heroWrap.style.display = "none";
+        return;
+      }
+
+      heroWrap.style.display = "block";
+      showHero(0);
+      startHero();
+    }catch(e){
+      console.warn("Hero load error:", e);
+      heroWrap.style.display = "none";
+    }
+  }
+
+  // ========= Live Counter =========
+  async function loadLiveCounters(){
+    try{
+      const snap = await db.collection("entries")
+        .orderBy("created", "desc")
+        .limit(500)
+        .get();
+
+      let freund = 0, gast = 0, likes = 0;
+
+      snap.docs.forEach(doc => {
+        const d = doc.data() || {};
+        if(d.type === "freundebuch") freund++;
+        if(d.type === "gaestebuch") gast++;
+        likes += (Number(d.likesCount || 0) || 0);
+      });
+
+      cntFreund.textContent = String(freund);
+      cntGast.textContent = String(gast);
+      cntLikes.textContent = String(likes);
+      cntNote.textContent = "Live-Stand aktualisiert.";
+    }catch(e){
+      console.warn("Counter load error:", e);
+      cntNote.textContent = "Live-Stand konnte nicht geladen werden.";
+    }
+  }
+
+  loadHeroImages();
+  loadLiveCounters();
+  setInterval(loadLiveCounters, 120000); // alle 2 Minuten refresh
+</script>
+
+</body>
+</html>
